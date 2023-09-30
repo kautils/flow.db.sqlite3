@@ -11,9 +11,7 @@ struct filter_database_sqlite3_handler{
     kautil::database::Sqlite3Stmt * insert;
     kautil::database::Sqlite3 * sql=0;
     kautil::database::sqlite3::Options * op=0;
-    std::string uri_prfx;
-    std::string id;
-    
+    std::string path;
     io_data i;
     io_data o;
     uint64_t io_len=0;
@@ -46,23 +44,27 @@ void filter_database_sqlite_free(void* whdl){
     delete m;
 }
 
-
-//int filter_database_sqlite_reset(void* whdl){ return 0; }
-
-int filter_database_sqlite_set_uri(void * whdl,const char * prfx,const char * id){
+int filter_database_sqlite_set_uri(void * whdl,const char * prfx,const char * filter_id,const char * state_id){
     auto m=get_instance(whdl);
-    m->uri_prfx = prfx; 
-    m->id = id; 
+    if(prfx) (m->path = prfx);
+    else m->path = "./filter_db_sqlite3/";
+    
+    if(0== bool(filter_id) + bool(state_id)){
+        m->path = "/not_specified";
+    }else{
+        if(filter_id)m->path.append("/").append(filter_id);
+        if(state_id)m->path.append("/").append(state_id);
+    }
+    m->path.append(".sqlite");
     return 0;
 }
 
 int filter_database_sqlite_setup(void * whdl){
     auto m=get_instance(whdl);
     if(!m->sql) {
-        auto path = m->uri_prfx +"/" + m->id + ".sqlite";
         {
             struct stat st;
-            auto buf = std::string(path.data());
+            auto buf = std::string(m->path.data());
             auto dir = dirname(buf.data());
             if(stat(dir,&st)){
                 if(mkdir(dir)){
@@ -72,7 +74,7 @@ int filter_database_sqlite_setup(void * whdl){
             } 
         }
         m->op = kautil::database::sqlite3::sqlite_options(); 
-        m->sql = new kautil::database::Sqlite3{path.data(),m->op->sqlite_open_create()|m->op->sqlite_open_readwrite()|m->op->sqlite_open_nomutex()};
+        m->sql = new kautil::database::Sqlite3{m->path.data(),m->op->sqlite_open_create()|m->op->sqlite_open_readwrite()|m->op->sqlite_open_nomutex()};
         m->create = m->sql->compile(m->is_without_rowid ? kCreateStWithoutRowid : kCreateSt);
         if(m->create){
             auto res_crt = m->create->step(true);
