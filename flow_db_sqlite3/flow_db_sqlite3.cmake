@@ -17,24 +17,10 @@ CMakeFetchKautilModule(sqlite
 find_package(KautilSqlite3.2.0.1.0.static REQUIRED)
 
 
-CMakeFetchKautilModule(sqlite
-        GIT https://github.com/kautils/sqlite3.git
-        REMOTE origin
-        TAG v2.0.1.0
-        CMAKE_CONFIGURE_MACRO -DCMAKE_CXX_FLAGS="-O2" -DCMAKE_CXX_STANDARD=23
-        CMAKE_BUILD_OPTION -j ${${m}_thread_cnt}
-        )
-find_package(KautilSqlite3.2.0.1.0.static REQUIRED)
-
-
-
-
-
 set(module_name sqlite3)
 unset(srcs)
 file(GLOB srcs ${CMAKE_CURRENT_LIST_DIR}/*.cc)
 set(${module_name}_common_pref
-    #DEBUG_VERBOSE
     MODULE_PREFIX kautil flow db
     MODULE_NAME ${module_name}
     INCLUDES $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}> $<INSTALL_INTERFACE:include> ${CMAKE_CURRENT_LIST_DIR} 
@@ -48,6 +34,7 @@ set(${module_name}_common_pref
     DESTINATION_CMAKE_DIR cmake
     DESTINATION_LIB_DIR lib
 )
+
 
 #CMakeLibraryTemplate(${module_name} EXPORT_LIB_TYPE static ${${module_name}_common_pref} )
 CMakeLibraryTemplate(${module_name} EXPORT_LIB_TYPE shared ${${module_name}_common_pref} )

@@ -133,7 +133,7 @@ int filter_database_sqlite_save(void * whdl){
             auto end_o = reinterpret_cast<const char*>(m->o.end);
             auto block_o = (end_o - begin_o) / m->io_len;
             auto fail = false;
-            if(begin_i < begin_o){
+            if(0== !(begin_i < end_i) + !(begin_o < end_o)){
                 m->sql->begin_transaction();
                 for(;begin_i != end_i; begin_i+=block_i,begin_o+=block_o){
                     auto res_stmt = !m->insert->set_blob(1,begin_i,block_i);
@@ -177,15 +177,13 @@ struct lookup_protocol_table_database_sqlite{
 } __attribute__((aligned(sizeof(uintptr_t))));
 
 
-extern "C" uint64_t __lookup_pointer_size(){ return sizeof(uintptr_t);}
-extern "C" lookup_protocol_table * __lookup_initialize(){ 
+extern "C" uint64_t  size_of_pointer(){ return sizeof(uintptr_t);}
+extern "C" lookup_protocol_table * lookup_table_initialize(){ 
     auto res= new lookup_protocol_table_database_sqlite{}; 
     return reinterpret_cast<lookup_protocol_table*>(res);
 }
-extern "C" void __lookup_free(lookup_protocol_table * f){
+extern "C" void lookup_table_free(lookup_protocol_table * f){
     auto entity = reinterpret_cast<lookup_protocol_table_database_sqlite*>(f);
     delete reinterpret_cast<filter_database_sqlite3_handler*>(entity->member.value);
     delete entity; 
 }
-
-
