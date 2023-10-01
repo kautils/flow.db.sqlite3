@@ -17,6 +17,7 @@ struct filter_database_sqlite3_handler{
     uint64_t io_len=0;
     bool is_overwrite=false;
     bool is_without_rowid=false;
+    bool is_uniformed=false;
 };
 
 
@@ -42,6 +43,11 @@ void filter_database_sqlite_free(void* whdl){
     delete m->op;
     delete m->sql;
     delete m;
+}
+
+
+uint64_t filter_database_sqlite_uri_hasher(const char * prfx,const char * filter_id,const char * state_id){
+    return std::hash<std::string>{}(std::string(prfx)+filter_id+state_id);
 }
 
 int filter_database_sqlite_set_uri(void * whdl,const char * prfx,const char * filter_id,const char * state_id){
@@ -108,7 +114,7 @@ int filter_database_sqlite_set_input(void * whdl,const void * begin,const void *
     return m->i.begin < m->i.end; 
 }
 
-int filter_database_sqlite_set_io_length(void * whdl,uint64_t len){
+int filter_database_sqlite_set_output_size(void * whdl,uint64_t len){
     auto m=get_instance(whdl);
     m->io_len= len;
     return 0;
@@ -123,6 +129,12 @@ int filter_database_sqlite_sw_overwrite(void * whdl,bool sw){
 int filter_database_sqlite_sw_without_rowid(void * whdl,bool sw){
     auto m=get_instance(whdl);
     m->is_without_rowid=sw;
+    return 0;
+}
+
+int filter_database_sqlite_sw_uniformed(void * whdl,bool sw){
+    auto m=get_instance(whdl);
+    m->is_uniformed=sw;
     return 0;
 }
 
@@ -166,13 +178,15 @@ struct lookup_protocol_elem{
 struct lookup_protocol_table_database_sqlite{
     lookup_protocol_elem initialize{.key="initialize",.value=(void*)filter_database_sqlite_initialize};
     lookup_protocol_elem free{.key="free",.value=(void*)filter_database_sqlite_free};
+    lookup_protocol_elem uri_hasher{.key="uri_hasher",.value=(void*) filter_database_sqlite_uri_hasher};
     lookup_protocol_elem set_uri{.key="set_uri",.value=(void*)filter_database_sqlite_set_uri};
     lookup_protocol_elem setup{.key="setup",.value=(void*)filter_database_sqlite_setup};
     lookup_protocol_elem set_output{.key="set_output",.value=(void*)filter_database_sqlite_set_output};
     lookup_protocol_elem set_input{.key="set_input",.value=(void*)filter_database_sqlite_set_input};
-    lookup_protocol_elem set_io_length{.key="set_io_length",.value=(void*)filter_database_sqlite_set_io_length};
+    lookup_protocol_elem set_output_size{.key="set_output_size",.value=(void*)filter_database_sqlite_set_output_size};
     lookup_protocol_elem sw_overwrite{.key="sw_overwrite",.value=(void*)filter_database_sqlite_sw_overwrite};
     lookup_protocol_elem sw_rowid{.key="sw_without_rowid",.value=(void*)filter_database_sqlite_sw_without_rowid};
+    lookup_protocol_elem sw_uniformed{.key="sw_uniformed",.value=(void*)filter_database_sqlite_sw_uniformed};
     lookup_protocol_elem save{.key="save",.value=(void*)filter_database_sqlite_save};
     lookup_protocol_elem member{.key="member",.value=(void*)filter_database_sqlite_initialize()};
     lookup_protocol_elem sentinel{.key=nullptr,.value=nullptr};
