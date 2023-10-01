@@ -5,7 +5,7 @@
 #include <string>
 
 
-struct io_data{ const void * begin;const void * end; };
+struct io_data{ const void * begin=0;const void * end=0; uint64_t block_size=0;  uint64_t nitems=0; };
 struct filter_database_sqlite3_handler{
     kautil::database::Sqlite3Stmt * create;
     kautil::database::Sqlite3Stmt * insert;
@@ -14,7 +14,8 @@ struct filter_database_sqlite3_handler{
     std::string path;
     io_data i;
     io_data o;
-    uint64_t io_len=0;
+    uint64_t * index=0;
+//    uint64_t o_len=0;
     bool is_overwrite=false;
     bool is_without_rowid=false;
     bool is_uniformed=false;
@@ -100,25 +101,30 @@ int filter_database_sqlite_setup(void * whdl){
 }
 
 
-int filter_database_sqlite_set_output(void * whdl,const void * begin,const void * end){
+int filter_database_sqlite_set_index(void * whdl,uint64_t * begin){
+    auto m=get_instance(whdl);
+    m->index = begin;
+    return !bool(m->index); 
+}
+
+int filter_database_sqlite_set_output(void * whdl,const void * begin,uint64_t block_size,uint64_t nitems){
     auto m=get_instance(whdl);
     m->o.begin = begin;
-    m->o.end = end;
+    m->o.end = (void*) (uintptr_t(begin)+uintptr_t(nitems*block_size));
+    m->o.nitems=nitems;
+    m->o.block_size=block_size;
     return m->o.begin < m->o.end; 
 }
 
-int filter_database_sqlite_set_input(void * whdl,const void * begin,const void * end){
+int filter_database_sqlite_set_input(void * whdl,const void * begin,uint64_t block_size,uint64_t nitems){
     auto m=get_instance(whdl);
     m->i.begin = begin;
-    m->i.end = end;
+    m->i.end = (void*) (uintptr_t(begin) + uintptr_t(block_size*nitems));
+    m->i.nitems=nitems;
+    m->i.block_size=block_size;
     return m->i.begin < m->i.end; 
 }
 
-int filter_database_sqlite_set_output_size(void * whdl,uint64_t len){
-    auto m=get_instance(whdl);
-    m->io_len= len;
-    return 0;
-}
 
 int filter_database_sqlite_sw_overwrite(void * whdl,bool sw){
     auto m=get_instance(whdl);
@@ -138,35 +144,53 @@ int filter_database_sqlite_sw_uniformed(void * whdl,bool sw){
     return 0;
 }
 
+
+
+static bool update_sqlite(filter_database_sqlite3_handler * m
+        ,const char * begin_i,uint64_t block_i
+        ,const char * begin_o,uint64_t block_o
+        ){
+    auto res_stmt = !m->insert->set_blob(1,begin_i,block_i);
+    res_stmt |= !m->insert->set_blob(2,begin_o,block_o);
+
+    auto res_step = m->insert->step(true);
+    res_step |= res_step == m->op->sqlite_ok();
+    
+    return res_stmt+!res_step;
+}
+
+
+
 int filter_database_sqlite_save(void * whdl){
     auto m=get_instance(whdl);
-    if(auto begin_i = reinterpret_cast<const char*>(m->i.begin)){
-        auto end_i = reinterpret_cast<const char*>(m->i.end);
-        auto block_i = (end_i - begin_i) / m->io_len;
-        if(auto begin_o = reinterpret_cast<const char*>(m->o.begin)){
-            auto end_o = reinterpret_cast<const char*>(m->o.end);
-            auto block_o = (end_o - begin_o) / m->io_len;
-            auto fail = false;
+    if(auto begin_o = reinterpret_cast<const char*>(m->o.begin)){
+        auto end_o = reinterpret_cast<const char*>(m->o.end);
+        auto block_o = m->o.block_size;
+        auto fail = false;
+        
+        if(auto begin_i = reinterpret_cast<const char*>(m->i.begin)){
+            auto end_i = reinterpret_cast<const char*>(m->i.end);
+            auto block_i = m->i.block_size;
+            
             if(0== !(begin_i < end_i) + !(begin_o < end_o)){
-                m->sql->begin_transaction();
-                for(;begin_i != end_i; begin_i+=block_i,begin_o+=block_o){
-                    auto res_stmt = !m->insert->set_blob(1,begin_i,block_i);
-                    res_stmt |= !m->insert->set_blob(2,begin_o,block_o);
-                    
-                    auto res_step = m->insert->step(true);
-                    res_step |= res_step == m->op->sqlite_ok();
-                    
-                    if((fail=res_stmt+!res_step))break;
+                if(m->index){ // limit : the result shrinked
+                    auto org_i= begin_i;
+                    for(auto i = 0; i < m->o.nitems; ++i,begin_i=org_i+(block_i*m->index[i]),begin_o+=block_o ){
+                        if((fail=update_sqlite(m,begin_i,block_i,begin_o,block_o)))break;
+                    }
+                }else{ // full
+                    for(;begin_i != end_i; begin_i+=block_i,begin_o+=block_o){
+                        if((fail=update_sqlite(m,begin_i,block_i,begin_o,block_o)))break;
+                    }
                 }
-                if(fail) m->sql->roll_back();
-                m->sql->end_transaction();
-                return !fail;
             }
+            if(fail) m->sql->roll_back();
+            m->sql->end_transaction();
+            return !fail;
         }
     }else m->sql->error_msg();
     return 1;
 }
-
 
 
 struct lookup_protocol_table{};
@@ -182,8 +206,8 @@ struct lookup_protocol_table_database_sqlite{
     lookup_protocol_elem set_uri{.key="set_uri",.value=(void*)filter_database_sqlite_set_uri};
     lookup_protocol_elem setup{.key="setup",.value=(void*)filter_database_sqlite_setup};
     lookup_protocol_elem set_output{.key="set_output",.value=(void*)filter_database_sqlite_set_output};
+    lookup_protocol_elem set_index{.key="set_index",.value=(void*)filter_database_sqlite_set_index};
     lookup_protocol_elem set_input{.key="set_input",.value=(void*)filter_database_sqlite_set_input};
-    lookup_protocol_elem set_output_size{.key="set_output_size",.value=(void*)filter_database_sqlite_set_output_size};
     lookup_protocol_elem sw_overwrite{.key="sw_overwrite",.value=(void*)filter_database_sqlite_sw_overwrite};
     lookup_protocol_elem sw_rowid{.key="sw_without_rowid",.value=(void*)filter_database_sqlite_sw_without_rowid};
     lookup_protocol_elem sw_uniformed{.key="sw_uniformed",.value=(void*)filter_database_sqlite_sw_uniformed};
