@@ -8,8 +8,8 @@
 
 struct io_data{ const void * begin=0;const void * end=0; uint64_t block_size=0;  uint64_t nitems=0; };
 struct filter_database_sqlite3_handler{
-    kautil::database::Sqlite3Stmt * create;
-    kautil::database::Sqlite3Stmt * insert;
+    kautil::database::Sqlite3Stmt * create=0;
+    kautil::database::Sqlite3Stmt * insert=0;
     kautil::database::Sqlite3 * sql=0;
     kautil::database::sqlite3::Options * op=0;
     std::string path;
@@ -43,6 +43,8 @@ void* filter_database_sqlite_initialize(){
 void filter_database_sqlite_free(void* whdl){
     auto m=get_instance(whdl);
     delete m->op;
+    if(m->create)m->create->release();
+    if(m->insert)m->insert->release();
     delete m->sql;
     delete m;
 }
@@ -68,6 +70,8 @@ int filter_database_sqlite_set_uri(void * whdl,const char * prfx,const char * fi
 }
 
 int filter_database_sqlite_setup(void * whdl){
+    
+    
     auto m=get_instance(whdl);
     if(!m->sql) {
         {
@@ -81,7 +85,7 @@ int filter_database_sqlite_setup(void * whdl){
                 }
             } 
         }
-        m->op = kautil::database::sqlite3::sqlite_options(); 
+        
         m->sql = new kautil::database::Sqlite3{m->path.data(),m->op->sqlite_open_create()|m->op->sqlite_open_readwrite()|m->op->sqlite_open_nomutex()};
         m->create = m->sql->compile(m->is_without_rowid ? kCreateStWithoutRowid : kCreateSt);
         if(m->create){
@@ -93,6 +97,8 @@ int filter_database_sqlite_setup(void * whdl){
         }
     }
     m->sql->error_msg();
+    if(m->create) m->create->release();
+    if(m->insert) m->insert->release();
     delete m->op;
     delete m->sql;
     m->op=nullptr;
@@ -247,4 +253,14 @@ extern "C" void lookup_table_free(lookup_protocol_table * f){
     auto entity = reinterpret_cast<lookup_protocol_table_database_sqlite*>(f);
     delete reinterpret_cast<filter_database_sqlite3_handler*>(entity->member.value);
     delete entity; 
+}
+
+
+int tmain_kautil_flow_db_sqlite3_shared(){
+    
+    auto a = filter_database_sqlite_initialize();
+    filter_database_sqlite_setup(a);
+    filter_database_sqlite_free(a);
+    
+    return 0;
 }
