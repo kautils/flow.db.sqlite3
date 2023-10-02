@@ -15,10 +15,10 @@ struct filter_database_sqlite3_handler{
     io_data i;
     io_data o;
     uint64_t * index=0;
-//    uint64_t o_len=0;
     bool is_overwrite=false;
     bool is_without_rowid=false;
     bool is_uniformed=false;
+    bool is_key_uniformed=false;
 };
 
 
@@ -144,6 +144,12 @@ int filter_database_sqlite_sw_uniformed(void * whdl,bool sw){
     return 0;
 }
 
+int filter_sw_key_is_uniformed(void * whdl,bool sw){
+    auto m=get_instance(whdl);
+    m->is_key_uniformed=sw;
+    return 0;
+}
+
 
 
 static bool update_sqlite(filter_database_sqlite3_handler * m
@@ -160,8 +166,70 @@ static bool update_sqlite(filter_database_sqlite3_handler * m
 }
 
 
-
+int _filter_database_sqlite_save(void * whdl);
+int _filter_database_sqlite_save_non_uniformed(void * whdl);
 int filter_database_sqlite_save(void * whdl){
+    auto m=get_instance(whdl);
+    if(m->is_uniformed){
+        return _filter_database_sqlite_save(whdl);
+    }else{
+        return _filter_database_sqlite_save_non_uniformed(whdl);
+    }
+}
+
+
+struct non_uniformed_protocol{ void * data=0;uint64_t size=0; }__attribute__((aligned(8)));
+int _filter_database_sqlite_save_non_uniformed(void * whdl){
+    auto m=get_instance(whdl);
+    if(auto begin_o = reinterpret_cast<const char*>(m->o.begin)){
+        auto end_o = reinterpret_cast<const char*>(m->o.end);
+        auto block_o = m->o.block_size;
+        auto fail = false;
+        
+        if(auto begin_i = reinterpret_cast<const char*>(m->i.begin)){
+            auto end_i = reinterpret_cast<const char*>(m->i.end);
+            auto block_i = m->i.block_size;
+            
+            if(0== !(begin_i < end_i) + !(begin_o < end_o)){
+                if(m->index){ // limit : the result shrinked
+                    auto org_i= begin_i;
+                    for(auto i = 0; i < m->o.nitems; ++i,begin_i=org_i+(block_i*m->index[i]),begin_o+=block_o ){
+                        auto arr = reinterpret_cast<const uint64_t*>(begin_o);
+                        
+                        auto ov = begin_o;auto ob = block_o;
+                        auto iv = begin_i;auto ib = block_i;
+                        
+                        if(!m->is_key_uniformed){
+                            ib=reinterpret_cast<const uint64_t*>(iv)[1]; 
+                            iv=(const char *)reinterpret_cast<const uint64_t*>(iv)[0]; 
+                        }
+                        
+                        if(!m->is_uniformed){
+                            ob=reinterpret_cast<const uint64_t*>(ov)[1]; 
+                            ov=(const char *)reinterpret_cast<const uint64_t*>(ov)[0]; 
+                        }
+                        if((fail=update_sqlite(m,iv,ib,ov,ob)))break;
+                    }
+                }else{ // full
+                    for(;begin_i != end_i; begin_i+=block_i,begin_o+=block_o){
+                        auto arr = reinterpret_cast<const uint64_t*>(begin_o);
+                        if((fail=update_sqlite(m,begin_i,block_i,(const char*)arr[0],arr[1])))break;
+                        //if((fail=update_sqlite(m,begin_i,block_i,begin_o,block_o)))break;
+                    }
+                    
+                }
+            }
+            if(fail) m->sql->roll_back();
+            m->sql->end_transaction();
+            return !fail;
+        }
+    }else m->sql->error_msg();
+    return 1;
+}
+
+
+
+int _filter_database_sqlite_save(void * whdl){
     auto m=get_instance(whdl);
     if(auto begin_o = reinterpret_cast<const char*>(m->o.begin)){
         auto end_o = reinterpret_cast<const char*>(m->o.end);
@@ -193,6 +261,8 @@ int filter_database_sqlite_save(void * whdl){
 }
 
 
+
+
 struct lookup_protocol_table{};
 struct lookup_protocol_elem{
     const char * key=nullptr;
@@ -211,6 +281,7 @@ struct lookup_protocol_table_database_sqlite{
     lookup_protocol_elem sw_overwrite{.key="sw_overwrite",.value=(void*)filter_database_sqlite_sw_overwrite};
     lookup_protocol_elem sw_rowid{.key="sw_without_rowid",.value=(void*)filter_database_sqlite_sw_without_rowid};
     lookup_protocol_elem sw_uniformed{.key="sw_uniformed",.value=(void*)filter_database_sqlite_sw_uniformed};
+    lookup_protocol_elem sw_key_is_uniformed{.key="sw_key_is_uniformed",.value=(void*)filter_sw_key_is_uniformed};
     lookup_protocol_elem save{.key="save",.value=(void*)filter_database_sqlite_save};
     lookup_protocol_elem member{.key="member",.value=(void*)filter_database_sqlite_initialize()};
     lookup_protocol_elem sentinel{.key=nullptr,.value=nullptr};
