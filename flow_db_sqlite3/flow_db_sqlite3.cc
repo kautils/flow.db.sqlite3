@@ -3,7 +3,6 @@
 #include <libgen.h>
 #include <sys/stat.h>
 #include <string>
-//#include "debug_new.h"
 
 
 struct io_data{ const void * begin=0;const void * end=0; uint64_t block_size=0;  uint64_t nitems=0; };

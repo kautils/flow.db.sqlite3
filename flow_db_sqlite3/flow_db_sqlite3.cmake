@@ -7,8 +7,6 @@ git_clone(https://raw.githubusercontent.com/kautils/CMakeLibrarytemplate/v0.0.1/
 git_clone(https://raw.githubusercontent.com/kautils/CMakeFetchKautilModule/v0.0.1/CMakeFetchKautilModule.cmake)
 
 
-
-
 CMakeFetchKautilModule(sqlite
         GIT https://github.com/kautils/sqlite3.git
         REMOTE origin
@@ -38,8 +36,6 @@ set(${module_name}_common_pref
     DESTINATION_LIB_DIR lib
 )
 
-
-#CMakeLibraryTemplate(${module_name} EXPORT_LIB_TYPE static ${${module_name}_common_pref} )
 CMakeLibraryTemplate(${module_name} EXPORT_LIB_TYPE shared ${${module_name}_common_pref} )
 
 set(__t ${${module_name}_shared_tmain})
