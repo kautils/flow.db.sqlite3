@@ -28,7 +28,7 @@ constexpr static const char * kCreateStWithoutRowid = "create table if not exist
 static const char * kInsertSt = "insert or ignore into m(k,v) values(?,?)";
 static const char * kInsertStOw = "insert or replace into m(k,v) values(?,?)";
 
-
+int mkdir_recurse(const char * path_to_dir);
 filter_database_sqlite3_handler* get_instance(void * whdl){
     return reinterpret_cast<filter_database_sqlite3_handler*>(whdl);
 }
@@ -70,19 +70,15 @@ int filter_database_sqlite_set_uri(void * whdl,const char * prfx,const char * fi
 
 int filter_database_sqlite_setup(void * whdl){
     
-    
     auto m=get_instance(whdl);
     if(!m->sql) {
         {
-            struct stat st;
-            auto buf = std::string(m->path.data());
+            auto buf = std::string{m->path.data()};
             auto dir = dirname(buf.data());
-            if(stat(dir,&st)){
-                if(mkdir(dir)){
-                    printf("fail");
-                    return 1;
-                }
-            } 
+            if(mkdir_recurse(dir)){
+                printf("fail to create directory \"%s\"\n",m->path.data());
+                return 1;
+            }
         }
         
         m->sql = new kautil::database::Sqlite3{m->path.data(),m->op->sqlite_open_create()|m->op->sqlite_open_readwrite()|m->op->sqlite_open_nomutex()};
@@ -255,11 +251,36 @@ extern "C" void lookup_table_free(lookup_protocol_table * f){
 }
 
 
+
+int mkdir_recurse(const char * path_to_dir){
+    auto p = std::string{path_to_dir};
+    auto c=p.data();
+    for(;;++c){
+        if(*c == '\\' || *c =='/'){
+            ++c;
+            auto evac = *c;
+            *c = 0;
+            struct stat st;
+            if(stat(p.data(),&st)){
+                printf("%s\n",p.data());fflush(stdout);
+                if(mkdir(p.data()))return 1;
+            }
+            *c = evac;
+        }
+        if(*c==0){
+            struct stat st;
+            if(stat(p.data(),&st)){
+                if(mkdir(p.data()))return 1;
+            }
+            break;
+        }
+    }
+    return 0;
+}
+
+
 int tmain_kautil_flow_db_sqlite3_shared(){
     
-    auto a = filter_database_sqlite_initialize();
-    filter_database_sqlite_setup(a);
-    filter_database_sqlite_free(a);
-    
+    exit(0);
     return 0;
 }
