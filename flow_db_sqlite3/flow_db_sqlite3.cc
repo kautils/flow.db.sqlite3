@@ -206,7 +206,7 @@ int filter_database_sqlite_save(void * whdl){
             }
             if(fail) m->sql->roll_back();
             m->sql->end_transaction();
-            return !fail;
+            return fail;
         }
     }else m->sql->error_msg();
     return 1;
