@@ -28,7 +28,7 @@ constexpr static const char * kCreateStWithoutRowid = "create table if not exist
 static const char * kInsertSt = "insert or ignore into m(k,v) values(?,?)";
 static const char * kInsertStOw = "insert or replace into m(k,v) values(?,?)";
 
-int mkdir_recurse(const char * path_to_dir);
+int mkdir_recurse(char * p);
 filter_database_sqlite3_handler* get_instance(void * whdl){
     return reinterpret_cast<filter_database_sqlite3_handler*>(whdl);
 }
