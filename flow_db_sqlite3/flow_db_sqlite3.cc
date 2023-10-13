@@ -252,31 +252,36 @@ extern "C" void lookup_table_free(lookup_protocol_table * f){
 
 
 
-int mkdir_recurse(const char * path_to_dir){
-    auto p = std::string{path_to_dir};
-    auto c=p.data();
-    for(;;++c){
-        if(*c == '\\' || *c =='/'){
+
+int mkdir_recurse(char * p){
+    
+    auto c = p;
+    struct stat st;
+
+    if(0==stat(p,&st)){
+        return !S_ISDIR(st.st_mode);
+    } 
+    auto b = true;
+    for(;b;++c){
+        if(*c == '\\' || *c=='/'){
             ++c;
-            auto evac = *c;
+            auto evacu = *c;
             *c = 0;
-            struct stat st;
-            if(stat(p.data(),&st)){
-                printf("%s\n",p.data());fflush(stdout);
-                if(mkdir(p.data()))return 1;
+            if(stat(p,&st)){
+                if(mkdir(p)) b = false;
             }
-            *c = evac;
+            *c = evacu;
         }
-        if(*c==0){
-            struct stat st;
-            if(stat(p.data(),&st)){
-                if(mkdir(p.data()))return 1;
-            }
-            break;
+        if(0==!b+!*c) continue;
+        if(stat(p,&st)){
+            if(mkdir(p)) b = false;
         }
+        break;
     }
-    return 0;
+    return !b;
 }
+
+
 
 
 int tmain_kautil_flow_db_sqlite3_shared(){
