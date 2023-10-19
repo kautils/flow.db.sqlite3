@@ -13,7 +13,6 @@ CMakeFetchKautilModule(sqlite
         TAG v2.0.1.0
         CMAKE_CONFIGURE_MACRO -DCMAKE_CXX_FLAGS="-O2" -DCMAKE_CXX_STANDARD=23
         CMAKE_BUILD_OPTION -j ${${m}_thread_cnt}
-        FORCE_BUILD
         )
 find_package(KautilSqlite3.2.0.1.0.static REQUIRED)
 
