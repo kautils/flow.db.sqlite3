@@ -180,6 +180,22 @@ static bool update_sqlite(filter_database_sqlite3_handler * m
 
 
 
+#include <sqlite3.h>
+
+int filter_database_sqlite_load(void * whdl,void * k, uint64_t k_size){
+    auto m=get_instance(whdl);
+    static const char * kInsertStOw = "select v from m where k==?";
+    auto stmt = m->sql->compile(kInsertStOw);
+    auto a = stmt->set_blob(1,k,k_size);
+    auto res =stmt->step(false);
+    if(auto data = sqlite3_column_blob(stmt->raw(),0)){
+        auto size = sqlite3_column_bytes(stmt->raw(),0);
+        printf("i,o{%f %f}\n",*((double*)k),*((double*)data));fflush(stdout);
+    }
+    return 0;
+}
+
+
 int filter_database_sqlite_save(void * whdl){
     auto m=get_instance(whdl);
     if(auto begin_o = reinterpret_cast<const char*>(m->o.begin)){
@@ -233,6 +249,7 @@ struct lookup_protocol_table_database_sqlite{
     lookup_protocol_elem sw_uniformed{.key="sw_uniformed",.value=(void*)filter_database_sqlite_sw_uniformed};
     lookup_protocol_elem sw_key_is_uniformed{.key="sw_key_is_uniformed",.value=(void*)filter_sw_key_is_uniformed};
     lookup_protocol_elem save{.key="save",.value=(void*)filter_database_sqlite_save};
+    lookup_protocol_elem load{.key="load",.value=(void*)filter_database_sqlite_load};
 //    lookup_protocol_elem member{.key="member",.value=(void*)filter_database_sqlite_initialize()};
     lookup_protocol_elem member{.key="member",.value=nullptr};
     lookup_protocol_elem sentinel{.key=nullptr,.value=nullptr};

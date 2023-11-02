@@ -1,19 +1,23 @@
-
-if(NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeKautilHeader.cmake)
-    file(DOWNLOAD https://raw.githubusercontent.com/kautils/CMakeKautilHeader/v0.0.1/CMakeKautilHeader.cmake ${CMAKE_BINARY_DIR}/CMakeKautilHeader.cmake)
+set(${m}_kautil_cmake_heeder CMakeKautilHeader.v0.0.cmake)
+if(DEFINED KAUTIL_THIRD_PARTY_DIR AND EXISTS "${KAUTIL_THIRD_PARTY_DIR}/${${m}_kautil_cmake_heeder}")
+    include("${KAUTIL_THIRD_PARTY_DIR}/${${m}_kautil_cmake_heeder}")
+else()
+    if(NOT EXISTS ${CMAKE_BINARY_DIR}/${${m}_kautil_cmake_heeder})
+        file(DOWNLOAD https://raw.githubusercontent.com/kautils/CMakeKautilHeader/v0.0/CMakeKautilHeader.cmake ${CMAKE_BINARY_DIR}/${${m}_kautil_cmake_heeder})
+    endif()
+    include(${CMAKE_BINARY_DIR}/${${m}_kautil_cmake_heeder})
 endif()
-include(${CMAKE_BINARY_DIR}/CMakeKautilHeader.cmake)
-git_clone(https://raw.githubusercontent.com/kautils/CMakeLibrarytemplate/v0.0.1/CMakeLibrarytemplate.cmake)
-git_clone(https://raw.githubusercontent.com/kautils/CMakeFetchKautilModule/v0.0.1/CMakeFetchKautilModule.cmake)
+
+git_clone(https://raw.githubusercontent.com/kautils/CMakeLibrarytemplate/v0.0/CMakeLibrarytemplate.cmake)
+git_clone(https://raw.githubusercontent.com/kautils/CMakeFetchKautilModule/v1.0/CMakeFetchKautilModule.cmake)
 
 
 CMakeFetchKautilModule(sqlite
         GIT https://github.com/kautils/sqlite3.git
         REMOTE origin
-        TAG v2.0.1.0
+        BRANCH v2.0
         CMAKE_CONFIGURE_MACRO -DCMAKE_CXX_FLAGS="-O2" -DCMAKE_CXX_STANDARD=23
-        CMAKE_BUILD_OPTION -j ${${m}_thread_cnt}
-        )
+        CMAKE_BUILD_OPTION -j ${${m}_thread_cnt})
 find_package(KautilSqlite3.2.0.1.0.static REQUIRED)
 
 
@@ -29,7 +33,7 @@ set(${module_name}_common_pref
     EXPORT_NAME_PREFIX ${PROJECT_NAME}FilterD
     EXPORT_VERSION ${PROJECT_VERSION}
     EXPORT_VERSION_COMPATIBILITY AnyNewerVersion
-        
+
     DESTINATION_INCLUDE_DIR include/kautil
     DESTINATION_CMAKE_DIR cmake
     DESTINATION_LIB_DIR lib
