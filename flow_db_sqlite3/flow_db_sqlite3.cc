@@ -9,6 +9,7 @@ struct io_data{ const void * begin=0;const void * end=0; uint64_t block_size=0; 
 struct filter_database_sqlite3_handler{
     kautil::database::Sqlite3Stmt * create=0;
     kautil::database::Sqlite3Stmt * insert=0;
+    kautil::database::Sqlite3Stmt * select_one_item=0;
     kautil::database::Sqlite3 * sql=0;
     kautil::database::sqlite3::Options * op=0;
     std::string path;
@@ -27,6 +28,7 @@ constexpr static const char * kCreateSt             = "create table if not exist
 constexpr static const char * kCreateStWithoutRowid = "create table if not exists m([k] blob primary key,[v] blob) without rowid ";
 static const char * kInsertSt = "insert or ignore into m(k,v) values(?,?)";
 static const char * kInsertStOw = "insert or replace into m(k,v) values(?,?)";
+static const char * kSelectOneItem = "select v from m where k==?";
 
 int mkdir_recurse(char * p);
 filter_database_sqlite3_handler* get_instance(void * whdl){
@@ -83,6 +85,7 @@ int filter_database_sqlite_setup(void * whdl){
         
         m->sql = new kautil::database::Sqlite3{m->path.data(),m->op->sqlite_open_create()|m->op->sqlite_open_readwrite()|m->op->sqlite_open_nomutex()};
         m->create = m->sql->compile(m->is_without_rowid ? kCreateStWithoutRowid : kCreateSt);
+        m->select_one_item = m->sql->compile(kSelectOneItem);
         if(m->create){
             auto res_crt = m->create->step(true);
             res_crt |= ((m->create->step(true) == m->op->sqlite_ok()));
@@ -182,17 +185,17 @@ static bool update_sqlite(filter_database_sqlite3_handler * m
 
 #include <sqlite3.h>
 
-int filter_database_sqlite_load(void * whdl,void * k, uint64_t k_size){
+
+
+// slow
+const void* filter_database_sqlite_load(void * whdl,void * k, uint64_t k_size){
     auto m=get_instance(whdl);
-    static const char * kInsertStOw = "select v from m where k==?";
-    auto stmt = m->sql->compile(kInsertStOw);
-    auto a = stmt->set_blob(1,k,k_size);
-    auto res =stmt->step(false);
-    if(auto data = sqlite3_column_blob(stmt->raw(),0)){
-        auto size = sqlite3_column_bytes(stmt->raw(),0);
-        printf("i,o{%f %f}\n",*((double*)k),*((double*)data));fflush(stdout);
+    m->select_one_item->set_blob(1,k,k_size);
+    auto res =m->select_one_item->step(false);
+    if(res == m->op->sqlite_row()){
+       return sqlite3_column_blob(m->select_one_item->raw(),0); 
     }
-    return 0;
+    return nullptr;
 }
 
 
